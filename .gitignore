@@ -2,6 +2,7 @@
 cache/
 out/
 lib/
+cdk/node_modules/
 
 # Ignores development broadcast logs
 !/broadcast
@@ -10,3 +11,6 @@ lib/
 
 # Dotenv file
 .env
+
+# Extension files
+*.zip

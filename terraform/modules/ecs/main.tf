@@ -341,16 +341,6 @@ resource "aws_ecs_service" "api" {
     container_port   = var.app_port
   }
 
-  deployment_configuration {
-    maximum_percent         = 200
-    minimum_healthy_percent = 100
-    
-    deployment_circuit_breaker {
-      enable   = true
-      rollback = true
-    }
-  }
-
   enable_execute_command = var.enable_execute_command
 
   depends_on = [aws_lb_listener.api]

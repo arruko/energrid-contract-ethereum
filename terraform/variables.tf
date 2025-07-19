@@ -218,3 +218,72 @@ variable "scale_down_threshold" {
   type        = number
   default     = 30
 }
+
+# ============================================
+# Hybrid Architecture Configuration
+# ============================================
+
+variable "ecr_repository_url" {
+  description = "ECR repository URL for container images"
+  type        = string
+  default     = ""
+}
+
+# Database Configuration
+variable "database_password" {
+  description = "Database password"
+  type        = string
+  sensitive   = true
+}
+
+variable "cache_auth_token" {
+  description = "Redis auth token"
+  type        = string
+  sensitive   = true
+  default     = ""
+}
+
+# Lambda Configuration
+variable "enable_lambda_services" {
+  description = "Enable Lambda-based services"
+  type        = bool
+  default     = true
+}
+
+variable "lambda_memory_size" {
+  description = "Default memory size for Lambda functions"
+  type        = number
+  default     = 256
+}
+
+variable "lambda_timeout" {
+  description = "Default timeout for Lambda functions"
+  type        = number
+  default     = 30
+}
+
+# API Gateway Configuration
+variable "api_throttle_rate" {
+  description = "API Gateway throttle rate (requests per second)"
+  type        = number
+  default     = 100
+}
+
+variable "api_throttle_burst" {
+  description = "API Gateway throttle burst limit"
+  type        = number
+  default     = 200
+}
+
+# Monitoring Configuration
+variable "enable_detailed_monitoring" {
+  description = "Enable detailed CloudWatch monitoring"
+  type        = bool
+  default     = true
+}
+
+variable "alarm_email" {
+  description = "Email address for CloudWatch alarms"
+  type        = string
+  default     = ""
+}

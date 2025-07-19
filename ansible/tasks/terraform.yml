@@ -1,0 +1,61 @@
+---
+# Terraform deployment tasks
+- name: Check if Terraform is installed
+  command: terraform version
+  register: terraform_version
+  failed_when: terraform_version.rc != 0
+  
+- name: Display Terraform version
+  debug:
+    msg: "Using {{ terraform_version.stdout_lines[0] }}"
+
+- name: Create terraform.tfvars from template
+  template:
+    src: terraform.tfvars.j2
+    dest: "{{ playbook_dir }}/../terraform/terraform.tfvars"
+    mode: '0644'
+  register: tfvars_created
+
+- name: Initialize Terraform
+  terraform:
+    project_path: "{{ playbook_dir }}/../terraform"
+    state: planned
+    plan_file: "{{ env_name }}.tfplan"
+    variables:
+      project_name: "{{ project_name }}"
+      environment: "{{ env_name }}"
+      vpc_cidr: "{{ vpc_cidr }}"
+      database_password: "{{ database_password }}"
+      cache_auth_token: "{{ cache_auth_token }}"
+      alarm_email: "{{ alarm_email }}"
+      admin_cidr_blocks: "{{ admin_cidr_blocks }}"
+    workspace: "{{ env_name }}"
+  register: terraform_plan
+
+- name: Display Terraform plan summary
+  debug:
+    msg: "Terraform plan completed. {{ terraform_plan.additions }} additions, {{ terraform_plan.changes }} changes, {{ terraform_plan.destructions }} destructions."
+
+- name: Apply Terraform configuration
+  terraform:
+    project_path: "{{ playbook_dir }}/../terraform"
+    state: present
+    plan_file: "{{ env_name }}.tfplan"
+    workspace: "{{ env_name }}"
+  register: terraform_apply
+  when: auto_approve | default(false)
+
+- name: Save Terraform outputs
+  terraform:
+    project_path: "{{ playbook_dir }}/../terraform"
+    state: present
+    workspace: "{{ env_name }}"
+  register: terraform_outputs
+
+- name: Display important outputs
+  debug:
+    msg:
+      - "VPC ID: {{ terraform_outputs.outputs.vpc_id.value }}"
+      - "ALB DNS: {{ terraform_outputs.outputs.alb_dns_name.value }}"
+      - "API Gateway URL: {{ terraform_outputs.outputs.api_gateway_url.value }}"
+  when: terraform_outputs.outputs is defined

@@ -1,0 +1,39 @@
+---
+# Staging environment variables
+project_name: "energrid"
+env_name: "staging"
+aws_region: "us-east-1"
+
+# Infrastructure
+vpc_cidr: "10.1.0.0/16"
+admin_cidr_blocks:
+  - "0.0.0.0/0"  # Update with your IP range
+
+# Database configuration
+database_instance_class: "db.t3.small"
+database_password: "StagingPassword123!"  # Change this!
+database_backup_retention: 14
+
+# Cache configuration
+cache_node_type: "cache.t3.small"
+cache_auth_token: "StagingCacheToken456!"  # Change this!
+
+# Container configuration
+container_cpu: 512
+container_memory: 1024
+desired_capacity: 1
+max_capacity: 5
+
+# Lambda configuration
+lambda_memory: 384
+lambda_timeout: 45
+
+# Monitoring
+alarm_email: "staging@energrid.com"  # Change this!
+enable_detailed_monitoring: true
+
+# Feature flags
+deploy_containers: true
+deploy_lambda: true
+setup_monitoring: true
+create_bastion: false

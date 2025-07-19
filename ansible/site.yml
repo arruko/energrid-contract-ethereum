@@ -1,0 +1,41 @@
+---
+# Energrid AWS Infrastructure Deployment Playbook
+- name: Deploy Energrid Infrastructure on AWS
+  hosts: localhost
+  gather_facts: false
+  vars:
+    project_name: "{{ project_name | default('energrid') }}"
+    environment: "{{ environment | default('development') }}"
+    aws_region: "{{ aws_region | default('us-east-1') }}"
+    
+  tasks:
+    - name: Include environment-specific variables
+      include_vars: "vars/{{ environment }}.yml"
+      
+    - name: Validate required variables
+      assert:
+        that:
+          - project_name is defined
+          - environment is defined
+          - aws_region is defined
+          - database_password is defined
+          - alarm_email is defined
+        fail_msg: "Required variables are missing. Check your environment vars file."
+
+    - name: Deploy infrastructure with Terraform
+      include_tasks: tasks/terraform.yml
+      
+    - name: Build and push Docker images
+      include_tasks: tasks/docker.yml
+      when: deploy_containers | default(true)
+      
+    - name: Deploy Lambda functions
+      include_tasks: tasks/lambda.yml
+      when: deploy_lambda | default(true)
+      
+    - name: Configure monitoring
+      include_tasks: tasks/monitoring.yml
+      when: setup_monitoring | default(true)
+      
+    - name: Run post-deployment validation
+      include_tasks: tasks/validation.yml

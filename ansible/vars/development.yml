@@ -1,0 +1,39 @@
+---
+# Development environment variables
+project_name: "energrid"
+environment: "development"
+aws_region: "us-east-1"
+
+# Infrastructure
+vpc_cidr: "10.0.0.0/16"
+admin_cidr_blocks:
+  - "0.0.0.0/0"  # Update with your IP range in production
+
+# Database configuration
+database_instance_class: "db.t3.micro"
+database_password: "DevPassword123!"  # Change this!
+database_backup_retention: 7
+
+# Cache configuration
+cache_node_type: "cache.t3.micro"
+cache_auth_token: "DevCacheToken456!"  # Change this!
+
+# Container configuration
+container_cpu: 256
+container_memory: 512
+desired_capacity: 1
+max_capacity: 3
+
+# Lambda configuration
+lambda_memory: 256
+lambda_timeout: 30
+
+# Monitoring
+alarm_email: "dev@energrid.com"  # Change this!
+enable_detailed_monitoring: false
+
+# Feature flags
+deploy_containers: true
+deploy_lambda: true
+setup_monitoring: true
+create_bastion: false

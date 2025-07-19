@@ -1,0 +1,71 @@
+---
+# Docker build and push tasks
+- name: Check if Docker is running
+  command: docker info
+  register: docker_info
+  failed_when: docker_info.rc != 0
+
+- name: Get ECR repository URL from Terraform outputs
+  set_fact:
+    ecr_url: "{{ terraform_outputs.outputs.ecr_repository_url.value }}"
+  when: terraform_outputs.outputs is defined
+
+- name: Extract AWS region from ECR URL
+  set_fact:
+    aws_region_from_ecr: "{{ ecr_url.split('.')[3] }}"
+  when: ecr_url is defined
+
+- name: Login to ECR
+  shell: |
+    aws ecr get-login-password --region {{ aws_region_from_ecr | default(aws_region) }} | \
+    docker login --username AWS --password-stdin {{ ecr_url }}
+  when: ecr_url is defined
+
+- name: Build Docker images
+  docker_image:
+    build:
+      path: "{{ playbook_dir }}/.."
+      dockerfile: "docker/{{ item }}/Dockerfile"
+    name: "energrid/{{ item }}"
+    tag: latest
+    source: build
+    force_source: true
+  loop:
+    - trading-engine
+    - blockchain-node
+    - iot-processor
+  register: build_results
+
+- name: Tag Docker images for ECR
+  docker_image:
+    name: "energrid/{{ item }}"
+    repository: "{{ ecr_url }}/{{ item }}"
+    tag: latest
+    source: local
+  loop:
+    - trading-engine
+    - blockchain-node
+    - iot-processor
+  when: ecr_url is defined
+
+- name: Push Docker images to ECR
+  docker_image:
+    name: "{{ ecr_url }}/{{ item }}"
+    tag: latest
+    push: true
+    source: local
+  loop:
+    - trading-engine
+    - blockchain-node
+    - iot-processor
+  when: ecr_url is defined
+  register: push_results
+
+- name: Display build and push results
+  debug:
+    msg: "Successfully built and pushed {{ item }} image"
+  loop:
+    - trading-engine
+    - blockchain-node
+    - iot-processor
+  when: push_results is succeeded

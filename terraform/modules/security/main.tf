@@ -270,3 +270,186 @@ resource "aws_wafv2_web_acl" "energrid" {
     sampled_requests_enabled    = true
   }
 }
+
+# Lambda Security Group
+resource "aws_security_group" "lambda" {
+  name_prefix = "${var.project_name}-lambda-"
+  vpc_id      = var.vpc_id
+  description = "Security group for Lambda functions"
+
+  # Outbound rules for Lambda functions
+  egress {
+    from_port   = 443
+    to_port     = 443
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+    description = "HTTPS outbound"
+  }
+
+  egress {
+    from_port   = 80
+    to_port     = 80
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+    description = "HTTP outbound"
+  }
+
+  # Database access
+  egress {
+    from_port       = 3306
+    to_port         = 3306
+    protocol        = "tcp"
+    security_groups = [aws_security_group.rds.id]
+    description     = "MySQL/RDS access"
+  }
+
+  # Redis access
+  egress {
+    from_port       = 6379
+    to_port         = 6379
+    protocol        = "tcp"
+    security_groups = [aws_security_group.elasticache.id]
+    description     = "Redis access"
+  }
+
+  tags = {
+    Name        = "${var.project_name}-lambda-sg"
+    Environment = var.environment
+  }
+
+  lifecycle {
+    create_before_destroy = true
+  }
+}
+
+# Update RDS security group to allow Lambda access
+resource "aws_security_group_rule" "rds_lambda_access" {
+  type                     = "ingress"
+  from_port                = 3306
+  to_port                  = 3306
+  protocol                 = "tcp"
+  source_security_group_id = aws_security_group.lambda.id
+  security_group_id        = aws_security_group.rds.id
+  description              = "MySQL/Aurora from Lambda"
+}
+
+# Update ElastiCache security group to allow Lambda access
+resource "aws_security_group_rule" "elasticache_lambda_access" {
+  type                     = "ingress"
+  from_port                = 6379
+  to_port                  = 6379
+  protocol                 = "tcp"
+  source_security_group_id = aws_security_group.lambda.id
+  security_group_id        = aws_security_group.elasticache.id
+  description              = "Redis from Lambda"
+}
+
+# Lambda Execution Role
+resource "aws_iam_role" "lambda_execution" {
+  name = "${var.project_name}-lambda-execution-role-${var.environment}"
+
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Action = "sts:AssumeRole"
+        Effect = "Allow"
+        Principal = {
+          Service = "lambda.amazonaws.com"
+        }
+      }
+    ]
+  })
+
+  tags = {
+    Name        = "${var.project_name}-lambda-execution-role"
+    Environment = var.environment
+  }
+}
+
+# Lambda VPC Execution Policy
+resource "aws_iam_role_policy_attachment" "lambda_vpc_execution" {
+  role       = aws_iam_role.lambda_execution.name
+  policy_arn = "arn:aws:iam::aws:policy/service-role/AWSLambdaVPCAccessExecutionRole"
+}
+
+# Lambda Basic Execution Policy
+resource "aws_iam_role_policy_attachment" "lambda_basic_execution" {
+  role       = aws_iam_role.lambda_execution.name
+  policy_arn = "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
+}
+
+# Custom policy for Lambda functions
+resource "aws_iam_policy" "lambda_custom" {
+  name        = "${var.project_name}-lambda-policy-${var.environment}"
+  description = "Custom policy for Energrid Lambda functions"
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Action = [
+          "dynamodb:GetItem",
+          "dynamodb:PutItem",
+          "dynamodb:UpdateItem",
+          "dynamodb:DeleteItem",
+          "dynamodb:Query",
+          "dynamodb:Scan"
+        ]
+        Resource = "arn:aws:dynamodb:*:*:table/${var.project_name}-*"
+      },
+      {
+        Effect = "Allow"
+        Action = [
+          "s3:GetObject",
+          "s3:PutObject",
+          "s3:DeleteObject"
+        ]
+        Resource = "arn:aws:s3:::${var.project_name}-*/*"
+      },
+      {
+        Effect = "Allow"
+        Action = [
+          "sns:Publish"
+        ]
+        Resource = "arn:aws:sns:*:*:${var.project_name}-*"
+      },
+      {
+        Effect = "Allow"
+        Action = [
+          "sqs:SendMessage",
+          "sqs:ReceiveMessage",
+          "sqs:DeleteMessage",
+          "sqs:GetQueueAttributes"
+        ]
+        Resource = "arn:aws:sqs:*:*:${var.project_name}-*"
+      },
+      {
+        Effect = "Allow"
+        Action = [
+          "ses:SendEmail",
+          "ses:SendRawEmail"
+        ]
+        Resource = "*"
+      },
+      {
+        Effect = "Allow"
+        Action = [
+          "cognito-idp:*"
+        ]
+        Resource = "arn:aws:cognito-idp:*:*:userpool/*"
+      }
+    ]
+  })
+
+  tags = {
+    Name        = "${var.project_name}-lambda-policy"
+    Environment = var.environment
+  }
+}
+
+resource "aws_iam_role_policy_attachment" "lambda_custom" {
+  role       = aws_iam_role.lambda_execution.name
+  policy_arn = aws_iam_policy.lambda_custom.arn
+}

@@ -1,0 +1,44 @@
+---
+# Production environment variables
+project_name: "energrid"
+env_name: "production"
+aws_region: "us-east-1"
+
+# Infrastructure
+vpc_cidr: "10.0.0.0/16"
+admin_cidr_blocks:
+  - "0.0.0.0/0"  # IMPORTANT: Update with your IP range!
+
+# Database configuration
+database_instance_class: "db.t3.medium"
+database_password: "{{ vault_database_password }}"  # Use ansible-vault
+database_backup_retention: 30
+database_multi_az: true
+
+# Cache configuration
+cache_node_type: "cache.t3.small"
+cache_auth_token: "{{ vault_cache_auth_token }}"  # Use ansible-vault
+
+# Container configuration
+container_cpu: 1024
+container_memory: 2048
+desired_capacity: 2
+max_capacity: 10
+
+# Lambda configuration
+lambda_memory: 512
+lambda_timeout: 60
+
+# Monitoring
+alarm_email: "admin@energrid.com"  # Change this!
+enable_detailed_monitoring: true
+
+# Feature flags
+deploy_containers: true
+deploy_lambda: true
+setup_monitoring: true
+create_bastion: true
+
+# Security
+enable_waf: true
+ssl_certificate_arn: "arn:aws:acm:us-east-1:123456789012:certificate/12345678-1234-1234-1234-123456789012"
