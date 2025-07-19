@@ -1,0 +1,75 @@
+---
+# Monitoring setup tasks
+- name: Create CloudWatch custom metrics
+  aws_cloudwatch_metric_alarm:
+    name: "{{ project_name }}-{{ env_name }}-{{ item.name }}"
+    metric_name: "{{ item.metric }}"
+    namespace: "{{ item.namespace }}"
+    statistic: "{{ item.statistic }}"
+    comparison: "{{ item.comparison }}"
+    threshold: "{{ item.threshold }}"
+    period: "{{ item.period | default(300) }}"
+    evaluation_periods: "{{ item.evaluation_periods | default(2) }}"
+    alarm_actions:
+      - "{{ sns_topic_arn }}"
+    state: present
+  loop:
+    - name: "high-cpu-utilization"
+      metric: "CPUUtilization"
+      namespace: "AWS/ECS"
+      statistic: "Average"
+      comparison: "GreaterThanThreshold"
+      threshold: 80
+    - name: "high-memory-utilization"
+      metric: "MemoryUtilization"
+      namespace: "AWS/ECS"
+      statistic: "Average"
+      comparison: "GreaterThanThreshold"
+      threshold: 85
+    - name: "lambda-error-rate"
+      metric: "Errors"
+      namespace: "AWS/Lambda"
+      statistic: "Sum"
+      comparison: "GreaterThanThreshold"
+      threshold: 10
+    - name: "api-gateway-4xx-errors"
+      metric: "4XXError"
+      namespace: "AWS/ApiGateway"
+      statistic: "Sum"
+      comparison: "GreaterThanThreshold"
+      threshold: 50
+  when: enable_detailed_monitoring and sns_topic_arn is defined
+
+- name: Create CloudWatch dashboard
+  aws_cloudwatch_dashboard:
+    name: "{{ project_name }}-{{ env_name }}-dashboard"
+    dashboard_body: "{{ lookup('template', 'dashboard.json.j2') | to_json }}"
+    state: present
+  when: setup_dashboard | default(true)
+
+- name: Setup log groups retention
+  aws_logs_group:
+    log_group_name: "/aws/ecs/{{ project_name }}-{{ env_name }}-{{ item }}"
+    retention: "{{ log_retention_days | default(14) }}"
+    state: present
+  loop:
+    - trading-engine
+    - blockchain-node
+    - iot-processor
+
+- name: Setup Lambda log groups retention
+  aws_logs_group:
+    log_group_name: "/aws/lambda/{{ project_name }}-{{ env_name }}-{{ item }}"
+    retention: "{{ log_retention_days | default(14) }}"
+    state: present
+  loop:
+    - auth-function
+    - notifications-function
+    - analytics-function
+    - certificates-function
+    - crud-api-function
+    - webhook-function
+
+- name: Display monitoring setup completion
+  debug:
+    msg: "Monitoring setup completed for {{ project_name }}-{{ env_name }}"

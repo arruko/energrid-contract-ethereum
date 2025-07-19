@@ -1,7 +1,7 @@
 ---
 # Development environment variables
 project_name: "energrid"
-environment: "development"
+env_name: "development"
 aws_region: "us-east-1"
 
 # Infrastructure

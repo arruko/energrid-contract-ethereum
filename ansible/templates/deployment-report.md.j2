@@ -1,0 +1,76 @@
+# Deployment Report
+
+**Project:** {{ project_name }}  
+**Environment:** {{ env_name }}  
+**Deployment Date:** {{ ansible_date_time.iso8601 }}  
+**Deployed By:** {{ ansible_user_id }}
+
+## Infrastructure Summary
+
+### AWS Resources Deployed
+- **VPC ID:** {{ terraform_outputs.outputs.vpc_id.value | default('N/A') }}
+- **Application Load Balancer:** {{ terraform_outputs.outputs.alb_dns_name.value | default('N/A') }}
+- **API Gateway URL:** {{ terraform_outputs.outputs.api_gateway_url.value | default('N/A') }}
+- **RDS Endpoint:** {{ terraform_outputs.outputs.rds_endpoint.value | default('N/A') }}
+- **Redis Endpoint:** {{ terraform_outputs.outputs.redis_endpoint.value | default('N/A') }}
+
+### ECS Services
+{% for service in ecs_services.results %}
+- **{{ service.item }}**: {{ service.services[0].runningCount }}/{{ service.services[0].desiredCount }} tasks running
+{% endfor %}
+
+### Lambda Functions
+{% for function in lambda_functions.results %}
+- **{{ function.item }}**: {{ function.configuration.State }}
+{% endfor %}
+
+## Health Checks
+
+### Application Load Balancer
+- **Status:** {{ 'Healthy' if alb_health.status == 200 else 'Unhealthy' }}
+- **Response Time:** {{ alb_health.elapsed | default('N/A') }} seconds
+
+### API Gateway
+- **Status:** {{ 'Healthy' if api_health.status == 200 else 'Unhealthy' }}
+- **Response Time:** {{ api_health.elapsed | default('N/A') }} seconds
+
+### Database
+- **Connection:** {{ 'Success' if db_info is defined else 'Not tested' }}
+
+### Redis Cache
+- **Connection:** {{ 'Success' if redis_ping is defined else 'Not tested' }}
+
+## Configuration
+
+### Environment Variables
+- **Container CPU:** {{ container_cpu }}
+- **Container Memory:** {{ container_memory }}MB
+- **Desired Capacity:** {{ desired_capacity }}
+- **Max Capacity:** {{ max_capacity }}
+
+### Feature Flags
+- **ECS Enabled:** {{ deploy_containers | default(true) }}
+- **Lambda Enabled:** {{ deploy_lambda | default(true) }}
+- **Monitoring Enabled:** {{ setup_monitoring | default(true) }}
+- **Bastion Host:** {{ create_bastion | default(false) }}
+
+## Next Steps
+
+1. **Update DNS Records:** Point your domain to {{ terraform_outputs.outputs.alb_dns_name.value | default('ALB_DNS_NAME') }}
+2. **SSL Configuration:** Configure SSL certificates in AWS Certificate Manager
+3. **Monitor Dashboards:** Access CloudWatch dashboard at AWS Console
+4. **Deploy Application Code:** Update container images with actual application code
+5. **Security Review:** Update security groups and IAM policies as needed
+
+## Troubleshooting
+
+If you encounter issues:
+
+1. Check CloudWatch logs for detailed error messages
+2. Verify security group configurations
+3. Ensure database credentials are correct
+4. Check ECS task definitions for resource allocation
+5. Review API Gateway logs for request failures
+
+---
+*This report was generated automatically by Ansible deployment pipeline.*

@@ -1,0 +1,45 @@
+# Energrid Terraform Configuration
+project_name = "{{ project_name }}"
+environment  = "{{ env_name }}"
+
+# Networking
+vpc_cidr = "{{ vpc_cidr }}"
+admin_cidr_blocks = {{ admin_cidr_blocks | to_json }}
+
+# Database
+database_password = "{{ database_password }}"
+
+# Cache
+cache_auth_token = "{{ cache_auth_token }}"
+
+# ECR Repository (will be auto-generated if not provided)
+ecr_repository_url = "{{ ecr_repository_url | default('') }}"
+
+# Monitoring
+alarm_email = "{{ alarm_email }}"
+
+# Container Configuration
+container_cpu = {{ container_cpu | default(512) }}
+container_memory = {{ container_memory | default(1024) }}
+desired_capacity = {{ desired_capacity | default(2) }}
+max_capacity = {{ max_capacity | default(10) }}
+
+# Lambda Configuration
+lambda_memory_size = {{ lambda_memory | default(256) }}
+lambda_timeout = {{ lambda_timeout | default(30) }}
+
+# Feature Flags
+enable_ecs = {{ deploy_containers | default(true) | lower }}
+enable_lambda = {{ deploy_lambda | default(true) | lower }}
+enable_monitoring = {{ setup_monitoring | default(true) | lower }}
+enable_bastion = {{ create_bastion | default(false) | lower }}
+
+{% if ssl_certificate_arn is defined %}
+# SSL Configuration
+ssl_certificate_arn = "{{ ssl_certificate_arn }}"
+{% endif %}
+
+{% if enable_waf is defined and enable_waf %}
+# WAF Configuration
+enable_waf = {{ enable_waf | lower }}
+{% endif %}

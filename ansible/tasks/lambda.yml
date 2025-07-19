@@ -1,0 +1,56 @@
+---
+# Lambda deployment tasks
+- name: Create Lambda deployment packages
+  archive:
+    path: "{{ playbook_dir }}/../terraform/modules/lambda/lambda-packages/{{ item }}"
+    dest: "{{ playbook_dir }}/../terraform/modules/lambda/lambda-packages/{{ item }}.zip"
+    format: zip
+  loop:
+    - auth-function
+    - notifications-function
+    - analytics-function
+    - certificates-function
+    - crud-api-function
+    - webhook-function
+
+- name: Verify Lambda packages exist
+  stat:
+    path: "{{ playbook_dir }}/../terraform/modules/lambda/lambda-packages/{{ item }}.zip"
+  loop:
+    - auth-function
+    - notifications-function
+    - analytics-function
+    - certificates-function
+    - crud-api-function
+    - webhook-function
+  register: lambda_packages
+
+- name: Display Lambda package status
+  debug:
+    msg: "Lambda package {{ item.item }} exists: {{ item.stat.exists }}"
+  loop: "{{ lambda_packages.results }}"
+
+- name: Update Lambda function code (if needed)
+  aws_lambda:
+    name: "{{ project_name }}-{{ env_name }}-{{ item }}"
+    zip_file: "{{ playbook_dir }}/../terraform/modules/lambda/lambda-packages/{{ item }}.zip"
+    runtime: nodejs18.x
+    handler: index.handler
+    memory_size: "{{ lambda_memory }}"
+    timeout: "{{ lambda_timeout }}"
+    state: present
+  loop:
+    - auth-function
+    - notifications-function
+    - analytics-function
+    - certificates-function
+    - crud-api-function
+    - webhook-function
+  when: update_lambda_code | default(false)
+  register: lambda_updates
+
+- name: Display Lambda update results
+  debug:
+    msg: "Lambda function {{ item.item }} updated successfully"
+  loop: "{{ lambda_updates.results }}"
+  when: lambda_updates is defined and item.changed

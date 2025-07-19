@@ -1,0 +1,93 @@
+---
+# Post-deployment validation tasks
+- name: Wait for ALB to be healthy
+  uri:
+    url: "http://{{ terraform_outputs.outputs.alb_dns_name.value }}/health"
+    method: GET
+    timeout: 30
+  register: alb_health
+  retries: 10
+  delay: 30
+  until: alb_health.status == 200
+  when: terraform_outputs.outputs is defined
+
+- name: Test API Gateway endpoints
+  uri:
+    url: "{{ terraform_outputs.outputs.api_gateway_url.value }}/health"
+    method: GET
+    timeout: 30
+  register: api_health
+  retries: 5
+  delay: 10
+  until: api_health.status == 200
+  when: terraform_outputs.outputs is defined
+
+- name: Validate ECS services are running
+  ecs_service_info:
+    cluster: "{{ project_name }}-{{ env_name }}-cluster"
+    service: "{{ project_name }}-{{ env_name }}-{{ item }}"
+  register: ecs_services
+  loop:
+    - trading-engine
+    - blockchain-node
+    - iot-processor
+
+- name: Check ECS service health
+  assert:
+    that:
+      - item.services[0].runningCount > 0
+      - item.services[0].desiredCount == item.services[0].runningCount
+    fail_msg: "ECS service {{ item.item }} is not healthy"
+  loop: "{{ ecs_services.results }}"
+
+- name: Validate Lambda functions
+  aws_lambda_info:
+    function_name: "{{ project_name }}-{{ env_name }}-{{ item }}"
+  register: lambda_functions
+  loop:
+    - auth-function
+    - notifications-function
+    - analytics-function
+    - certificates-function
+    - crud-api-function
+    - webhook-function
+
+- name: Check Lambda function state
+  assert:
+    that:
+      - item.configuration.State == "Active"
+    fail_msg: "Lambda function {{ item.item }} is not active"
+  loop: "{{ lambda_functions.results }}"
+
+- name: Test database connectivity
+  mysql_info:
+    login_host: "{{ terraform_outputs.outputs.rds_endpoint.value.split(':')[0] }}"
+    login_user: "{{ database_username | default('energrid') }}"
+    login_password: "{{ database_password }}"
+    login_db: "energrid"
+  register: db_info
+  when: terraform_outputs.outputs is defined
+
+- name: Validate Redis connectivity
+  redis:
+    command: ping
+    login_host: "{{ terraform_outputs.outputs.redis_endpoint.value }}"
+  register: redis_ping
+  when: terraform_outputs.outputs is defined
+
+- name: Generate deployment report
+  template:
+    src: deployment-report.md.j2
+    dest: "{{ playbook_dir }}/reports/deployment-{{ env_name }}-{{ ansible_date_time.epoch }}.md"
+    mode: '0644'
+
+- name: Display validation summary
+  debug:
+    msg:
+      - "Deployment validation completed successfully!"
+      - "ALB Health: {{ alb_health.status | default('Not tested') }}"
+      - "API Gateway Health: {{ api_health.status | default('Not tested') }}"
+      - "ECS Services: {{ ecs_services.results | length }} running"
+      - "Lambda Functions: {{ lambda_functions.results | length }} active"
+      - "Database: {{ 'Connected' if db_info is defined else 'Not tested' }}"
+      - "Redis: {{ 'Connected' if redis_ping is defined else 'Not tested' }}"

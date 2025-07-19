@@ -9,7 +9,7 @@ set -e
 # Configuration
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 TERRAFORM_DIR="$SCRIPT_DIR/terraform"
-SRC_DIR="$SCRIPT_DIR/src"
+DOCKER_DIR="$SCRIPT_DIR/docker"
 
 # Colors for output
 RED='\033[0;31m'
@@ -161,71 +161,32 @@ build_and_push_images() {
     # Login to ECR
     aws ecr get-login-password --region "$REGION" | docker login --username AWS --password-stdin "$ECR_URL"
     
-    # Check if src directory exists
-    if [[ ! -d "$SRC_DIR" ]]; then
-        warning "Source directory not found. Creating placeholder images..."
-        create_placeholder_images
-        return 0
+    # Check if docker directory exists
+    if [[ ! -d "$DOCKER_DIR" ]]; then
+        error "Docker directory not found at $DOCKER_DIR"
+        error "Please ensure docker/ directory exists with Dockerfile for each service"
+        return 1
     fi
     
     # Build and push images
     local images=("trading-engine" "blockchain-node" "iot-processor")
     
     for image in "${images[@]}"; do
-        if [[ -d "$SRC_DIR/$image" ]]; then
+        if [[ -d "$DOCKER_DIR/$image" && -f "$DOCKER_DIR/$image/Dockerfile" ]]; then
             log "Building $image..."
-            docker build -t "energrid/$image" "$SRC_DIR/$image"
+            docker build -t "energrid/$image" -f "$DOCKER_DIR/$image/Dockerfile" .
             docker tag "energrid/$image:latest" "$ECR_URL/$image:latest"
             docker push "$ECR_URL/$image:latest"
             success "$image image pushed successfully"
         else
-            warning "$image source not found, skipping..."
+            error "$image Dockerfile not found at $DOCKER_DIR/$image/Dockerfile"
+            return 1
         fi
     done
 }
 
-# Create placeholder images if source doesn't exist
-create_placeholder_images() {
-    log "Creating placeholder container images..."
-    
-    local images=("trading-engine" "blockchain-node" "iot-processor")
-    
-    for image in "${images[@]}"; do
-        # Create temporary directory
-        local temp_dir=$(mktemp -d)
-        
-        # Create simple Dockerfile
-        cat > "$temp_dir/Dockerfile" << EOF
-FROM nginx:alpine
-COPY index.html /usr/share/nginx/html/
-EXPOSE 80
-CMD ["nginx", "-g", "daemon off;"]
-EOF
-        
-        # Create simple index.html
-        cat > "$temp_dir/index.html" << EOF
-<!DOCTYPE html>
-<html>
-<head><title>$image Placeholder</title></head>
-<body>
-    <h1>$image Service</h1>
-    <p>This is a placeholder for the $image service.</p>
-    <p>Environment: $ENVIRONMENT</p>
-</body>
-</html>
-EOF
-        
-        # Build and push
-        docker build -t "energrid/$image" "$temp_dir"
-        docker tag "energrid/$image:latest" "$ECR_URL/$image:latest"
-        docker push "$ECR_URL/$image:latest"
-        
-        # Cleanup
-        rm -rf "$temp_dir"
-        
-        success "Placeholder $image image created and pushed"
-    done
-}
+# Remove placeholder image creation function since we have proper Dockerfiles
+# create_placeholder_images() { ... }
 
 # Build Lambda packages
 build_lambda_packages() {
@@ -305,9 +266,10 @@ main() {
         log "Next steps:"
         log "1. Update DNS records to point to the ALB"
         log "2. Configure SSL certificates in ACM"
-        log "3. Update ECR repository URL in terraform.tfvars"
-        log "4. Deploy actual application code"
-        log "5. Configure monitoring alerts"
+        log "3. Deploy actual application code to src/ directory"
+        log "4. Configure monitoring alerts"
+        log "5. For more robust deployment, consider using Ansible:"
+        log "   cd ansible && ansible-playbook site.yml -e environment=$ENVIRONMENT"
         echo
         log "Dashboard URL: https://console.aws.amazon.com/cloudwatch/home#dashboards"
         log "API Gateway URL: Check terraform outputs above"
