@@ -1,0 +1,55 @@
+# Terraform configuration for different environments
+
+# Production Environment
+environment         = "production"
+project_name       = "energrid"
+blockchain_network = "mainnet"
+
+# Networking
+vpc_cidr = "10.0.0.0/16"
+admin_cidr_blocks = [
+  # Add your admin IP addresses here
+  # "203.0.113.0/24",  # Office network
+  # "198.51.100.0/24", # VPN network
+]
+enable_bastion = false # Set to true if you need emergency SSH access
+
+# Application Configuration
+app_image      = "energrid/api:latest"
+desired_count  = 3  # Higher for production
+task_cpu       = 2048
+task_memory    = 4096
+
+# Database Configuration
+enable_rds              = true
+rds_instance_class     = "db.t3.small"  # Appropriate for production
+rds_allocated_storage  = 100
+rds_max_allocated_storage = 1000
+rds_backup_retention   = 30  # 30 days for production
+
+# Cache Configuration
+enable_elasticache = true
+redis_node_type   = "cache.t3.small"
+
+# Security Configuration
+waf_rate_limit = 5000  # Higher limit for production
+
+# Auto Scaling Configuration
+enable_auto_scaling    = true
+min_capacity          = 2
+max_capacity          = 20
+scale_up_threshold    = 70
+scale_down_threshold  = 30
+
+# Logging Configuration
+enable_alb_logs      = true
+log_retention_days   = 90  # Longer retention for production
+enable_ecs_exec      = false  # Disabled for security in production
+
+# SSL Certificate (replace with your actual certificate ARN)
+ssl_certificate_arn = "arn:aws:acm:us-east-1:ACCOUNT_ID:certificate/CERTIFICATE_ID"
+
+# Database credentials (use AWS Secrets Manager in production)
+database_name     = "energrid"
+database_username = "energrid"
+database_password = "CHANGE_ME_USE_SECRETS_MANAGER"  # Replace with secure password
